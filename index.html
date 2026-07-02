@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Propofol TCI Simulator — Marsh (effect-site)</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a2028;
+    --panel-2: #222b35;
+    --border: #2c3846;
+    --text: #e6edf3;
+    --muted: #8b98a5;
+    --accent: #4aa3ff;
+    --ce: #45d19a;      /* effect-site green */
+    --cp: #4aa3ff;      /* plasma blue */
+    --target: #f0b429;  /* target amber */
+    --danger: #ff6b6b;
+    --ok: #45d19a;
+    --shadow: 0 6px 24px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 24px 16px 64px;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 2px; letter-spacing: .2px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
+
+  .disclaimer {
+    background: rgba(255,107,107,.10);
+    border: 1px solid rgba(255,107,107,.35);
+    color: #ffb3b3;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 12.5px;
+    margin-bottom: 20px;
+  }
+  .disclaimer b { color: #ff8f8f; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+    margin-bottom: 18px;
+  }
+  .card h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 0 0 16px; }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .field small { display:block; color: var(--muted); font-size: 11.5px; margin-top: 4px; opacity:.8; }
+  input[type=number] {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 9px; padding: 11px 12px; font-size: 16px;
+    outline: none; transition: border-color .15s;
+  }
+  input[type=number]:focus { border-color: var(--accent); }
+  input.invalid { border-color: var(--danger); }
+  .unit { color: var(--muted); font-weight: 600; font-size: 13px; }
+
+  button {
+    font: inherit; font-weight: 600; cursor: pointer; border: none;
+    border-radius: 9px; padding: 11px 18px; transition: transform .05s, background .15s, opacity .15s;
+  }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: #04121f; }
+  .btn-primary:hover:not(:disabled) { background: #6cb6ff; }
+  .btn-ghost { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover:not(:disabled) { background: #2b3644; }
+  .btn-give { background: var(--ce); color: #04160f; }
+  .btn-give:hover:not(:disabled) { background: #63e0ae; }
+  .btn-danger { background: transparent; color: var(--danger); border: 1px solid rgba(255,107,107,.4); }
+  .btn-danger:hover { background: rgba(255,107,107,.12); }
+
+  .errmsg { color: var(--danger); font-size: 12.5px; margin-top: 10px; min-height: 16px; }
+
+  /* ---- running view ---- */
+  #runView { display: none; }
+  .readouts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 4px; }
+  @media (max-width: 640px) { .readouts { grid-template-columns: repeat(2,1fr); } }
+  .readout {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 11px;
+    padding: 14px; text-align: center;
+  }
+  .readout .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+  .readout .v { font-size: 27px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .readout .u { font-size: 12px; color: var(--muted); }
+  .v.ce { color: var(--ce); }
+  .v.cp { color: var(--cp); }
+  .v.tg { color: var(--target); }
+
+  .prompt {
+    margin-top: 16px; border-radius: 12px; padding: 16px 18px;
+    display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+    border: 1px solid transparent;
+  }
+  .prompt.load { background: rgba(74,163,255,.12); border-color: rgba(74,163,255,.4); }
+  .prompt.topup { background: rgba(240,180,41,.12); border-color: rgba(240,180,41,.45); }
+  .prompt .msg { font-size: 15px; }
+  .prompt .msg b { font-size: 19px; }
+  .prompt.hidden { display: none; }
+
+  .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+  .toolbar .spacer { flex: 1; }
+  .manual { display: flex; align-items: center; gap: 8px; }
+  .manual input { width: 96px; }
+  .speed { display: flex; align-items: center; gap: 6px; }
+  .speed .seg { display: inline-flex; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+  .speed .seg button { background: transparent; color: var(--muted); border-radius: 0; padding: 8px 12px; font-size: 13px; }
+  .speed .seg button.active { background: var(--accent); color: #04121f; }
+
+  .chartwrap { margin-top: 6px; }
+  canvas { width: 100%; height: 300px; display: block; border-radius: 10px; }
+  .legend { display: flex; gap: 18px; font-size: 12.5px; color: var(--muted); margin-top: 8px; flex-wrap: wrap; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+  .swatch.ce { background: var(--ce); }
+  .swatch.cp { background: var(--cp); }
+  .swatch.tg { background: var(--target); }
+  .swatch.dash { background: repeating-linear-gradient(90deg, var(--target) 0 4px, transparent 4px 7px); }
+
+  .modelnote { font-size: 11.5px; color: var(--muted); margin-top: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Propofol TCI Simulator</h1>
+  <p class="sub">Marsh model (modified, effect-site targeting · ke0 = 1.2 min⁻¹)</p>
+
+  <div class="disclaimer">
+    <b>Educational simulation only.</b> This reproduces published Marsh pharmacokinetic math for teaching.
+    It is <b>not</b> a medical device and must <b>not</b> be used for real patient care or dosing decisions.
+  </div>
+
+  <!-- SETUP -->
+  <div class="card" id="setupView">
+    <h2>Patient &amp; target</h2>
+    <div class="grid">
+      <div class="field">
+        <label for="age">Age <span class="unit">(years)</span></label>
+        <input type="number" id="age" min="16" max="120" step="1" value="40" />
+        <small>Marsh does not use age — recorded only.</small>
+      </div>
+      <div class="field">
+        <label for="weight">Body weight <span class="unit">(kg)</span></label>
+        <input type="number" id="weight" min="30" max="250" step="1" value="70" />
+        <small>Drives all Marsh volumes &amp; clearances.</small>
+      </div>
+      <div class="field">
+        <label for="target">Target effect-site Ce <span class="unit">(µg/mL)</span></label>
+        <input type="number" id="target" min="0.5" max="8" step="0.1" value="4" />
+        <small>Typical induction 4–6, maintenance 2–4.</small>
+      </div>
+    </div>
+    <div style="margin-top:18px; display:flex; align-items:center; gap:12px;">
+      <button class="btn-primary" id="startBtn">Start simulation</button>
+      <span class="errmsg" id="setupErr"></span>
+    </div>
+  </div>
+
+  <!-- RUNNING -->
+  <div class="card" id="runView">
+    <div class="readouts">
+      <div class="readout"><div class="k">Elapsed</div><div class="v" id="roTime">00:00</div><div class="u">mm:ss</div></div>
+      <div class="readout"><div class="k">Effect site Ce</div><div class="v ce" id="roCe">0.00</div><div class="u">µg/mL</div></div>
+      <div class="readout"><div class="k">Plasma Cp</div><div class="v cp" id="roCp">0.00</div><div class="u">µg/mL</div></div>
+      <div class="readout"><div class="k">Target</div><div class="v tg" id="roTarget">4.0</div><div class="u">µg/mL</div></div>
+    </div>
+
+    <div class="prompt hidden" id="prompt">
+      <div class="msg" id="promptMsg"></div>
+      <button class="btn-give" id="administerBtn">Administer</button>
+    </div>
+
+    <div class="toolbar">
+      <div class="manual">
+        <input type="number" id="manualDose" min="1" max="1000" step="5" value="20" />
+        <span class="unit">mg</span>
+        <button class="btn-give" id="manualBtn">Give bolus now</button>
+      </div>
+      <div class="spacer"></div>
+      <div class="speed">
+        <span class="unit">Speed</span>
+        <span class="seg" id="speedSeg">
+          <button data-s="1" class="active">1×</button>
+          <button data-s="2">2×</button>
+          <button data-s="5">5×</button>
+          <button data-s="10">10×</button>
+        </span>
+      </div>
+      <button class="btn-ghost" id="pauseBtn">Pause</button>
+      <button class="btn-danger" id="resetBtn">Reset</button>
+    </div>
+
+    <div class="chartwrap">
+      <canvas id="chart" width="900" height="300"></canvas>
+      <div class="legend">
+        <span><i class="swatch ce"></i> Effect-site Ce</span>
+        <span><i class="swatch cp"></i> Plasma Cp</span>
+        <span><i class="swatch dash"></i> Target</span>
+        <span><i class="swatch tg"></i> Bolus given</span>
+      </div>
+    </div>
+
+    <div class="modelnote" id="modelNote"></div>
+  </div>
+</div>
+
+<script>
+/* ===== Marsh model (inlined from marsh.js — single self-contained file) ===== */
+(function (global) {
+  'use strict';
+  var MARSH_RATES = { k10:0.119, k12:0.112, k13:0.042, k21:0.055, k31:0.0033, V1_per_kg:0.228 };
+  var DEFAULT_KE0 = 1.2;
+  function createModel(weightKg, options) {
+    options = options || {};
+    var ke0 = (options.ke0 != null) ? options.ke0 : DEFAULT_KE0;
+    return { weight:weightKg, V1:MARSH_RATES.V1_per_kg*weightKg,
+      k10:MARSH_RATES.k10, k12:MARSH_RATES.k12, k13:MARSH_RATES.k13,
+      k21:MARSH_RATES.k21, k31:MARSH_RATES.k31, ke0:ke0 };
+  }
+  function initialState() { return { A1:0, A2:0, A3:0, Ce:0 }; }
+  function cloneState(s) { return { A1:s.A1, A2:s.A2, A3:s.A3, Ce:s.Ce }; }
+  function plasmaConc(m, s) { return s.A1 / m.V1; }
+  function derivs(m, s, inf) {
+    inf = inf || 0; var Cp = s.A1 / m.V1;
+    return {
+      A1: -(m.k10+m.k12+m.k13)*s.A1 + m.k21*s.A2 + m.k31*s.A3 + inf,
+      A2: m.k12*s.A1 - m.k21*s.A2,
+      A3: m.k13*s.A1 - m.k31*s.A3,
+      Ce: m.ke0*(Cp - s.Ce)
+    };
+  }
+  function _adv(s,k,h){ return { A1:s.A1+h*k.A1, A2:s.A2+h*k.A2, A3:s.A3+h*k.A3, Ce:s.Ce+h*k.Ce }; }
+  function step(m, s, dt, inf) {
+    var k1=derivs(m,s,inf), s2=_adv(s,k1,0.5*dt),
+        k2=derivs(m,s2,inf), s3=_adv(s,k2,0.5*dt),
+        k3=derivs(m,s3,inf), s4=_adv(s,k3,dt),
+        k4=derivs(m,s4,inf);
+    return {
+      A1: s.A1 + dt/6*(k1.A1+2*k2.A1+2*k3.A1+k4.A1),
+      A2: s.A2 + dt/6*(k1.A2+2*k2.A2+2*k3.A2+k4.A2),
+      A3: s.A3 + dt/6*(k1.A3+2*k2.A3+2*k3.A3+k4.A3),
+      Ce: s.Ce + dt/6*(k1.Ce+2*k2.Ce+2*k3.Ce+k4.Ce)
+    };
+  }
+  function giveBolus(s, mg){ var ns=cloneState(s); ns.A1+=mg; return ns; }
+  function peakCeAfterBolus(m, s, mg, horizon, dt){
+    horizon=horizon||8; dt=dt||(1/60);
+    var st=giveBolus(s,mg), peak=st.Ce, n=Math.round(horizon/dt);
+    for(var i=0;i<n;i++){ st=step(m,st,dt); if(st.Ce>peak) peak=st.Ce; }
+    return peak;
+  }
+  function bolusForTargetPeak(m, s, target, horizon, dt){
+    if(peakCeAfterBolus(m,s,0,horizon,dt) >= target) return 0;
+    var lo=0, hi=1;
+    while(peakCeAfterBolus(m,s,hi,horizon,dt) < target && hi<1e6) hi*=2;
+    for(var i=0;i<50;i++){ var mid=0.5*(lo+hi);
+      if(peakCeAfterBolus(m,s,mid,horizon,dt) < target) lo=mid; else hi=mid; }
+    return 0.5*(lo+hi);
+  }
+  global.Marsh = { createModel, initialState, cloneState, plasmaConc, step,
+    giveBolus, peakCeAfterBolus, bolusForTargetPeak, DEFAULT_KE0 };
+})(window);
+
+/* ===== Application ===== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+
+  var THRESHOLD_FRAC = 0.90;   // re-bolus when Ce decays to 90% of target
+  var TICK_MS = 100;           // real-time UI tick
+  var HISTORY_MIN = 15;        // rolling chart window (minutes)
+
+  var app = {
+    model: null, state: null, target: 0,
+    clockMin: 0, speed: 1, running: false, paused: false,
+    loadingGiven: false, timer: null,
+    history: [],  // {t, ce, cp}
+    boluses: [],  // {t, mg, kind}
+    pending: null // {kind:'load'|'topup', mg}
+  };
+
+  /* ---------- Setup / validation ---------- */
+  function readInputs() {
+    return {
+      age: parseFloat($('age').value),
+      weight: parseFloat($('weight').value),
+      target: parseFloat($('target').value)
+    };
+  }
+  function validate(v) {
+    var errs = [];
+    $('age').classList.remove('invalid'); $('weight').classList.remove('invalid'); $('target').classList.remove('invalid');
+    if (!(v.age >= 16 && v.age <= 120)) { errs.push('Age must be 16–120 years.'); $('age').classList.add('invalid'); }
+    if (!(v.weight >= 30 && v.weight <= 250)) { errs.push('Weight must be 30–250 kg.'); $('weight').classList.add('invalid'); }
+    if (!(v.target >= 0.5 && v.target <= 8)) { errs.push('Target Ce must be 0.5–8 µg/mL.'); $('target').classList.add('invalid'); }
+    return errs;
+  }
+
+  function start() {
+    var v = readInputs();
+    var errs = validate(v);
+    if (errs.length) { $('setupErr').textContent = errs[0]; return; }
+    $('setupErr').textContent = '';
+
+    app.model = Marsh.createModel(v.weight);
+    app.state = Marsh.initialState();
+    app.target = v.target;
+    app.clockMin = 0; app.speed = 1; app.paused = false;
+    app.loadingGiven = false; app.history = []; app.boluses = []; app.pending = null;
+
+    $('setupView').style.display = 'none';
+    $('runView').style.display = 'block';
+    $('roTarget').textContent = v.target.toFixed(1);
+    $('modelNote').textContent =
+      'Marsh V1 = ' + app.model.V1.toFixed(2) + ' L (0.228 L/kg × ' + v.weight +
+      ' kg) · ke0 = 1.2 min⁻¹ · re-bolus threshold = ' + Math.round(THRESHOLD_FRAC*100) + '% of target.';
+
+    // Loading bolus prompt
+    var load = Marsh.bolusForTargetPeak(app.model, app.state, app.target);
+    app.pending = { kind: 'load', mg: load };
+    showPrompt();
+
+    app.running = true;
+    recordHistory();
+    loop();
+  }
+
+  /* ---------- Simulation loop ---------- */
+  function loop() {
+    clearInterval(app.timer);
+    app.timer = setInterval(tick, TICK_MS);
+  }
+  function tick() {
+    if (!app.running || app.paused) return;
+    // advance model by (TICK_MS * speed) of real time, in <=1s sub-steps
+    var advanceMin = (TICK_MS / 1000) * app.speed / 60;
+    var sub = 1 / 120; // 0.5s model steps
+    var remaining = advanceMin;
+    while (remaining > 1e-9) {
+      var dt = Math.min(sub, remaining);
+      app.state = Marsh.step(app.model, app.state, dt);
+      remaining -= dt;
+    }
+    app.clockMin += advanceMin;
+
+    checkMaintenance();
+    recordHistory();
+    render();
+  }
+
+  function checkMaintenance() {
+    if (!app.loadingGiven) return;           // wait until loading dose administered
+    if (app.pending) {                        // keep the pending top-up sized to current state
+      if (app.pending.kind === 'topup') {
+        app.pending.mg = Marsh.bolusForTargetPeak(app.model, app.state, app.target);
+        showPrompt();
+      }
+      return;
+    }
+    var ce = app.state.Ce;
+    var cp = Marsh.plasmaConc(app.model, app.state);
+    if (ce <= THRESHOLD_FRAC * app.target && cp < app.target) {
+      var mg = Marsh.bolusForTargetPeak(app.model, app.state, app.target);
+      app.pending = { kind: 'topup', mg: mg };
+      showPrompt();
+    }
+  }
+
+  /* ---------- Boluses ---------- */
+  function administerPending() {
+    if (!app.pending) return;
+    injectBolus(app.pending.mg, app.pending.kind);
+    if (app.pending.kind === 'load') app.loadingGiven = true;
+    app.pending = null;
+    hidePrompt();
+    render();
+  }
+  function injectBolus(mg, kind) {
+    if (!(mg > 0)) return;
+    app.state = Marsh.giveBolus(app.state, mg);
+    app.boluses.push({ t: app.clockMin, mg: mg, kind: kind || 'manual' });
+  }
+  function manualBolus() {
+    var mg = parseFloat($('manualDose').value);
+    if (!(mg > 0)) return;
+    injectBolus(mg, 'manual');
+    recordHistory();
+    render();
+  }
+
+  /* ---------- History & render ---------- */
+  function recordHistory() {
+    app.history.push({ t: app.clockMin, ce: app.state.Ce, cp: Marsh.plasmaConc(app.model, app.state) });
+    var cutoff = app.clockMin - HISTORY_MIN;
+    while (app.history.length > 2 && app.history[0].t < cutoff) app.history.shift();
+  }
+  function render() {
+    $('roTime').textContent = fmtTime(app.clockMin);
+    $('roCe').textContent = app.state.Ce.toFixed(2);
+    $('roCp').textContent = Marsh.plasmaConc(app.model, app.state).toFixed(2);
+    drawChart();
+  }
+  function fmtTime(min) {
+    var s = Math.floor(min * 60);
+    var mm = Math.floor(s / 60), ss = s % 60;
+    return (mm < 10 ? '0' : '') + mm + ':' + (ss < 10 ? '0' : '') + ss;
+  }
+
+  function showPrompt() {
+    var p = $('prompt'), msg = $('promptMsg');
+    if (!app.pending) { hidePrompt(); return; }
+    p.classList.remove('hidden', 'load', 'topup');
+    if (app.pending.kind === 'load') {
+      p.classList.add('load');
+      msg.innerHTML = 'Give <b>loading bolus: ' + Math.round(app.pending.mg) + ' mg</b> now ' +
+        '(' + (app.pending.mg / app.model.weight).toFixed(2) + ' mg/kg) to reach target.';
+      $('administerBtn').textContent = 'Administer loading dose';
+    } else {
+      p.classList.add('topup');
+      msg.innerHTML = 'Effect-site Ce dropped to ' + Math.round(THRESHOLD_FRAC*100) +
+        '% of target — give <b>top-up: ' + Math.round(app.pending.mg) + ' mg</b>.';
+      $('administerBtn').textContent = 'Administer top-up';
+    }
+  }
+  function hidePrompt() { $('prompt').classList.add('hidden'); }
+
+  /* ---------- Chart ---------- */
+  function drawChart() {
+    var cv = $('chart'), ctx = cv.getContext('2d');
+    var W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H);
+    var padL = 44, padR = 12, padT = 14, padB = 26;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+
+    // domains
+    var tMax = Math.max(app.clockMin, HISTORY_MIN * 0.25);
+    var tMin = Math.max(0, tMax - HISTORY_MIN);
+    if (app.clockMin < HISTORY_MIN) { tMin = 0; tMax = HISTORY_MIN; }
+    var yMax = app.target * 1.6;
+    for (var i = 0; i < app.history.length; i++) yMax = Math.max(yMax, app.history[i].cp * 1.1);
+    yMax = Math.max(yMax, app.target * 1.6);
+
+    function X(t) { return padL + (t - tMin) / (tMax - tMin) * plotW; }
+    function Y(y) { return padT + plotH - (y / yMax) * plotH; }
+
+    // grid + y labels
+    ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.fillStyle = '#8b98a5';
+    ctx.font = '11px -apple-system, sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    var yStep = niceStep(yMax / 4);
+    for (var gy = 0; gy <= yMax + 1e-6; gy += yStep) {
+      var py = Y(gy);
+      ctx.beginPath(); ctx.moveTo(padL, py); ctx.lineTo(W - padR, py); ctx.stroke();
+      ctx.fillText(gy.toFixed(gy < 10 ? 1 : 0), padL - 6, py);
+    }
+    // x labels
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    var xStep = niceStep((tMax - tMin) / 5);
+    for (var gx = Math.ceil(tMin / xStep) * xStep; gx <= tMax + 1e-6; gx += xStep) {
+      var px = X(gx);
+      ctx.fillText(gx.toFixed(0) + 'm', px, H - padB + 6);
+    }
+
+    // target line
+    ctx.strokeStyle = getVar('--target'); ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(padL, Y(app.target)); ctx.lineTo(W - padR, Y(app.target)); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // bolus markers
+    for (var b = 0; b < app.boluses.length; b++) {
+      var bt = app.boluses[b].t;
+      if (bt < tMin || bt > tMax) continue;
+      ctx.strokeStyle = 'rgba(240,180,41,.5)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(X(bt), padT); ctx.lineTo(X(bt), padT + plotH); ctx.stroke();
+    }
+
+    plotSeries(ctx, X, Y, 'cp', getVar('--cp'), tMin, tMax);
+    plotSeries(ctx, X, Y, 'ce', getVar('--ce'), tMin, tMax);
+  }
+  function plotSeries(ctx, X, Y, key, color, tMin, tMax) {
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
+    var started = false;
+    for (var i = 0; i < app.history.length; i++) {
+      var h = app.history[i];
+      if (h.t < tMin || h.t > tMax) continue;
+      var px = X(h.t), py = Y(h[key]);
+      if (!started) { ctx.moveTo(px, py); started = true; } else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+  function niceStep(raw) {
+    var pow = Math.pow(10, Math.floor(Math.log10(raw)));
+    var n = raw / pow;
+    var s = n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10;
+    return s * pow;
+  }
+  function getVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  /* ---------- Controls ---------- */
+  function setSpeed(s) {
+    app.speed = s;
+    var btns = $('speedSeg').querySelectorAll('button');
+    btns.forEach(function (b) { b.classList.toggle('active', parseFloat(b.dataset.s) === s); });
+  }
+  function togglePause() {
+    app.paused = !app.paused;
+    $('pauseBtn').textContent = app.paused ? 'Resume' : 'Pause';
+  }
+  function reset() {
+    clearInterval(app.timer);
+    app.running = false;
+    $('runView').style.display = 'none';
+    $('setupView').style.display = 'block';
+    $('pauseBtn').textContent = 'Pause';
+    setSpeed(1);
+    hidePrompt();
+  }
+
+  /* ---------- Wire up ---------- */
+  window.addEventListener('DOMContentLoaded', function () {
+    $('startBtn').addEventListener('click', start);
+    $('administerBtn').addEventListener('click', administerPending);
+    $('manualBtn').addEventListener('click', manualBolus);
+    $('pauseBtn').addEventListener('click', togglePause);
+    $('resetBtn').addEventListener('click', reset);
+    $('speedSeg').addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return; setSpeed(parseFloat(b.dataset.s));
+    });
+  });
+
+  // expose for debugging/verification
+  window.__app = app;
+  window.__test = {
+    // advance the simulation deterministically by `minutes`, running the same
+    // per-tick maintenance + history logic used by the real-time loop.
+    advance: function (minutes) {
+      var sub = 1 / 120, remaining = minutes;
+      while (remaining > 1e-9) {
+        var dt = Math.min(sub, remaining);
+        app.state = Marsh.step(app.model, app.state, dt);
+        remaining -= dt;
+        app.clockMin += dt;
+        checkMaintenance();
+        recordHistory();
+      }
+      render();
+    },
+    administer: administerPending,
+    manual: manualBolus,
+    snapshot: function () {
+      return {
+        t: +app.clockMin.toFixed(3), ce: +app.state.Ce.toFixed(3),
+        cp: +Marsh.plasmaConc(app.model, app.state).toFixed(3),
+        loadingGiven: app.loadingGiven,
+        pending: app.pending ? { kind: app.pending.kind, mg: Math.round(app.pending.mg) } : null,
+        boluses: app.boluses.map(function (b) { return { t: +b.t.toFixed(2), mg: Math.round(b.mg), kind: b.kind }; })
+      };
+    }
+  };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+# Local Claude Code tooling / preview config
+.claude/
+
+# OS / editor cruft
+.DS_Store
+*.swp
+
+# Node (only if you ever add deps for testing)
+node_modules/
