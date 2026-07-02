@@ -1,5 +1,7 @@
 # Propofol TCI Simulator — Marsh (effect-site)
 
+**Live:** https://drleeanaes.github.io/propofol-tci-simulator/
+
 An educational, single-file web app that simulates propofol effect-site
 concentration using the **modified Marsh** pharmacokinetic model (3 compartments
 + effect site, ke0 = 1.2 min⁻¹). It computes a loading bolus to reach a target
@@ -18,6 +20,10 @@ It's a single self-contained `index.html` — no build, no dependencies.
   `python3 -m http.server 8777` → http://localhost:8777
 - **Host it:** drop `index.html` on any static host (GitHub Pages, Netlify,
   Cloudflare Pages, S3, etc.). Nothing server-side is required.
+
+This repo auto-deploys to GitHub Pages via `.github/workflows/deploy.yml` on every
+push to `main`. To redeploy, just push; to deploy manually, run the "Deploy static
+site to GitHub Pages" workflow from the Actions tab.
 
 ## How it works
 
